@@ -15,24 +15,32 @@ namespace Microsoft.PowerFx.Connectors
     /// </summary>
     public class PowerPlatformConnectorClient : HttpClient
     {
-        private readonly HttpClient _client = new HttpClient(); // $$$ Share
+        private readonly HttpMessageInvoker _client;
 
         public string ConnectionId;
 
-        public PowerPlatformConnectorClient(string endpoint)
+        // For example, "firstrelease-001.azure-apim.net" 
+        public string Endpoint { get; }
+
+        /// <summary>
+        /// Callback to get the auth token. 
+        /// Invoke as a callback since token may need to be refreshed. 
+        /// </summary>
+        public Func<string> GetAuthToken { get; }
+
+        public string EnvironmentId { get; set; }
+
+        public PowerPlatformConnectorClient(string endpoint, Func<string> getAuthToken, HttpMessageInvoker httpInvoker = null)
         {
+            _client = httpInvoker ?? new HttpClient();
+
+            GetAuthToken = getAuthToken ?? throw new ArgumentNullException(nameof(getAuthToken));
+            
             Endpoint = endpoint;
-            _client.BaseAddress = new Uri("https://" + endpoint); // $$$ Breaks sharing!
 
-            BaseAddress = _client.BaseAddress; // Needed for callers.  
+            // Must set to allow callers to invoke SendAsync() via other helper methods.
+            BaseAddress = new Uri("https://" + endpoint); // Uri.Parse will validate endpoint syntax. 
         }
-
-        public string Endpoint;
-
-        // Stamp on request.  Need to refresh?
-        public string AuthToken; // $$$ NEeds to be callback..
-
-        public string EnvironmentId;
 
         public override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -48,22 +56,22 @@ namespace Microsoft.PowerFx.Connectors
 
             var method = request.Method;
             var useCache = method == HttpMethod.Get;
-            
+
+            var authToken = GetAuthToken();
+
             var req = new HttpRequestMessage(HttpMethod.Post, $"https://{Endpoint}/invoke");
             req.Headers.Add("authority", Endpoint);
             req.Headers.Add("scheme", "https");
             req.Headers.Add("path", "/invoke");
             req.Headers.Add("x-ms-client-session-id", "f4d37a97-f1c7-4c8c-80a6-f300c651568d");
             req.Headers.Add("x-ms-request-method", method.ToString());
-            req.Headers.Add("authorization", "Bearer " + AuthToken);
+            req.Headers.Add("authorization", "Bearer " + authToken);
             req.Headers.Add("x-ms-client-environment-id", "/providers/Microsoft.PowerApps/environments/" + EnvironmentId);
             req.Headers.Add("x-ms-user-agent", "PowerApps/3.21124.0 (Web AuthoringTool; AppName=<NonCloudApp>)");
 
             req.Headers.Add("x-ms-request-url", url); 
 
             // $$$ Body? 
-
-            // $$$ Need to sue basePath
 
             var response = await _client.SendAsync(req, cancellationToken);
             return response;

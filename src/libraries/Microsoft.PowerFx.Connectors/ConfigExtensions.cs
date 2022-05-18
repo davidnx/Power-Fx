@@ -62,7 +62,7 @@ namespace Microsoft.PowerFx
                     var verb = model.ToMethod(kv2.Key); // "GET"
                     var op = kv2.Value;
 
-                    // $$$ Pull description/summary for intellisense?
+                    // $$$ Pull description/summary for intellisense? (get for ServiceFunction)
                     var operationName = op.OperationId ?? path.Replace("/", string.Empty);
 
                     var paramTypes = new List<FormulaType>();
