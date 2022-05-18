@@ -28,11 +28,16 @@ namespace Microsoft.PowerFx
         // $$$ HttpClient only needed if we want to invoke... (not needed for binding)
 
         // $$$ Return the functions that we did add?
-        public static void AddService(this PowerFxConfig config, string @namespace, OpenApiDocument openApiDocument, HttpClient httpClient)
+        public static void AddService(this PowerFxConfig config, string functionNamespace, OpenApiDocument openApiDocument, HttpClient httpClient)
         {
             if (openApiDocument == null)
             {
                 throw new ArgumentNullException(nameof(openApiDocument));
+            }
+
+            if (string.IsNullOrWhiteSpace(functionNamespace))
+            {
+                throw new ArgumentException(nameof(functionNamespace));
             }
 
             string basePath = null;
@@ -45,7 +50,6 @@ namespace Microsoft.PowerFx
                 basePath = uri.PathAndQuery;
             }
 
-            // $$$ Use namespace. 
             var model = new OpenApiModel(openApiDocument);
 
             foreach (var kv in openApiDocument.Paths)
@@ -98,9 +102,9 @@ namespace Microsoft.PowerFx
 
                     var invoker = (httpClient == null) ? 
                         null : 
-                        new Invoker(httpClient, verb, path, requiredParams.ToArray());
+                        new HttpFunctionInvoker(httpClient, verb, path, requiredParams.ToArray());
 
-                    var function = new MyTexlFunction(operationName, returnType, paramTypes.ToArray())
+                    var function = new MyTexlFunction(functionNamespace, operationName, returnType, paramTypes.ToArray())
                     {
                         _invoker = invoker
                     };
@@ -111,109 +115,21 @@ namespace Microsoft.PowerFx
         }
 
         // $$$ Add Cache for HttpGet...
-
-        private class Invoker
-        {
-            private readonly HttpClient _httpClient;
-            private readonly HttpMethod _method;
-            private readonly string _path;
-            private readonly OpenApiParameter[] _parameters;
-
-            public Invoker(HttpClient httpClient, HttpMethod method, string path, OpenApiParameter[] parameters)
-            {
-                _httpClient = httpClient;
-                _method = method;
-                _path = path;
-                _parameters = parameters;
-            }
-
-            public HttpRequestMessage BuildRequest(FormulaValue[] args)
-            {
-                var path = _path;
-
-                // var connectionId = "xyz";
-                // path = path.Replace("{connectionId}", connectionId);
-                var query = new StringBuilder();
-
-                for (var i = 0; i < _parameters.Length; i++)
-                {
-                    var value = args[i].ToObject().ToString();
-
-                    var param = _parameters[i];
-                    switch (param.In.Value)
-                    {
-                        case ParameterLocation.Path:
-                            path = path.Replace("{" + param.Name + "}", HttpUtility.UrlEncode(value));
-                            break;
-
-                        case ParameterLocation.Query:
-                            query.Append((query.Length == 0) ? "?" : "&");
-                            query.Append(param.Name);
-                            query.Append('=');
-                            query.Append(HttpUtility.UrlEncode(value));
-                            break;
-
-                        default:
-                            throw new NotImplementedException($"{param.In}");
-                    }
-                }
-
-                var url = path + query.ToString();
-
-                // $$$ Body? For posts 
-                var request = new HttpRequestMessage(_method, url);
-                return request;
-            }
-
-            public async Task<FormulaValue> DecodeResponseAsync(HttpResponseMessage response)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    var msg = $"Connector called failed {response.StatusCode}): " + json;
-
-                    // $$$ Do any connectors have 40x behavior here in their response code?
-                    // or 201 long-ops behavior?
-
-                    // $$$ Still type this. 
-                    return FormulaValue.NewError(new ExpressionError
-                    {
-                        Kind = ErrorKind.Unknown, 
-                        Message = msg
-                    });
-                }
-
-                // $$$ Proper marshalling?
-                var result = FormulaValue.FromJson(json);
-                return result;
-            }
-
-            public async Task<FormulaValue> InvokeAsync(CancellationToken cancel, FormulaValue[] args)
-            {
-                var request = BuildRequest(args);
-                var response = await _httpClient.SendAsync(request, cancel);
-
-                var result = await DecodeResponseAsync(response);
-                return result;
-            }
-        }
-
         // $$$ Replace with ServiceFunction 
         private class MyTexlFunction : TexlFunction, IAsyncTexlFunction
         {
             // $$$ Post operations should be behavior 
             public override bool IsSelfContained => true;
 
-            public Invoker _invoker;
+            public HttpFunctionInvoker _invoker;
             
-            public MyTexlFunction(string name, FormulaType returnType, params FormulaType[] paramTypes)
-    : this(name, returnType._type, Array.ConvertAll(paramTypes, x => x._type))
+            public MyTexlFunction(string functionNamespace, string name, FormulaType returnType, params FormulaType[] paramTypes)
+    : this(functionNamespace, name, returnType._type, Array.ConvertAll(paramTypes, x => x._type))
             {
             }
 
-            public MyTexlFunction(string name, DType returnType, params DType[] paramTypes)
-                : base(DPath.Root, name, name, SG("Custom func " + name), FunctionCategories.MathAndStat, returnType, 0, paramTypes.Length, paramTypes.Length, paramTypes)
+            public MyTexlFunction(string functionNamespace, string name, DType returnType, params DType[] paramTypes)
+                : base(DPath.Root.Append(new DName(functionNamespace)), name, name, SG("Custom func " + name), FunctionCategories.MathAndStat, returnType, 0, paramTypes.Length, paramTypes.Length, paramTypes)
             {
             }
 

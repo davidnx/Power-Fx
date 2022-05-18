@@ -22,15 +22,15 @@ namespace Microsoft.PowerFx.Connectors
         public PowerPlatformConnectorClient(string endpoint)
         {
             Endpoint = endpoint;
-            _client.BaseAddress = new Uri("https://" + endpoint);
+            _client.BaseAddress = new Uri("https://" + endpoint); // $$$ Breaks sharing!
 
-            BaseAddress = _client.BaseAddress; // Needed for callers. 
+            BaseAddress = _client.BaseAddress; // Needed for callers.  
         }
 
         public string Endpoint;
 
         // Stamp on request.  Need to refresh?
-        public string AuthToken;
+        public string AuthToken; // $$$ NEeds to be callback..
 
         public string EnvironmentId;
 
