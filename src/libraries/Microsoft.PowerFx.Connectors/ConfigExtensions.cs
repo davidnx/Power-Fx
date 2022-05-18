@@ -22,13 +22,24 @@ using static Microsoft.PowerFx.Core.Localization.TexlStrings;
 
 namespace Microsoft.PowerFx
 {
+    // $$$ Split into separate classes 
+
     public static class ConfigExtensions
     {
         // - Must be HttpClient since we need to set the BaseAddress
         // $$$ HttpClient only needed if we want to invoke... (not needed for binding)
-
         // $$$ Return the functions that we did add?
-        public static void AddService(this PowerFxConfig config, string functionNamespace, OpenApiDocument openApiDocument, HttpClient httpClient)
+
+        /// <summary>
+        /// Add functions for each operation in the <see cref="OpenApiDocument"/>. 
+        /// Functions names will be 'functionNamespace.operationName'.
+        /// Functions are invoked via rest via the httpClient. The client must handle authentication. 
+        /// </summary>
+        /// <param name="config"></param>
+        /// <param name="functionNamespace"></param>
+        /// <param name="openApiDocument"></param>
+        /// <param name="httpClient"></param>
+        public static IReadOnlyList<FunctionInfo> AddService(this PowerFxConfig config, string functionNamespace, OpenApiDocument openApiDocument, HttpMessageInvoker httpClient, ICachingHttpClient cache = null)
         {
             if (openApiDocument == null)
             {
@@ -39,6 +50,8 @@ namespace Microsoft.PowerFx
             {
                 throw new ArgumentException(nameof(functionNamespace));
             }
+
+            var newFunctions = new List<FunctionInfo>();
 
             string basePath = null;
             if (openApiDocument?.Servers.Count == 1)
@@ -93,6 +106,13 @@ namespace Microsoft.PowerFx
                         requiredParams.Add(param);
                     }
 
+                    if (op.RequestBody != null)
+                    {
+                        // RequestBody can be ambiguous- treat as a single record? splat as parameters?
+                        // $$$ Pull this impl from ServiceFunction
+                        throw new NotImplementedException($"Request body");
+                    }
+
                     var returnType = model.GetReturnType(op);
                     
                     if (basePath != null)
@@ -102,7 +122,7 @@ namespace Microsoft.PowerFx
 
                     var invoker = (httpClient == null) ? 
                         null : 
-                        new HttpFunctionInvoker(httpClient, verb, path, requiredParams.ToArray());
+                        new HttpFunctionInvoker(httpClient, verb, path, returnType, requiredParams.ToArray(), cache);
 
                     var function = new MyTexlFunction(functionNamespace, operationName, returnType, paramTypes.ToArray())
                     {
@@ -110,8 +130,11 @@ namespace Microsoft.PowerFx
                     };
 
                     config.AddFunction(function);
+                    newFunctions.Add(new FunctionInfo(function));
                 }
             }
+
+            return newFunctions;
         }
 
         // $$$ Add Cache for HttpGet...
@@ -145,7 +168,8 @@ namespace Microsoft.PowerFx
 
             public Task<FormulaValue> InvokeAsync(FormulaValue[] args, CancellationToken cancel)
             {
-                return _invoker.InvokeAsync(cancel, args);
+                var cacheScope = Namespace.Name.Value;
+                return _invoker.InvokeAsync(cacheScope, cancel, args);
             }
         }
     }

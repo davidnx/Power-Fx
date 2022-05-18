@@ -15,17 +15,22 @@ namespace Microsoft.PowerFx.Connectors
     // Given Power Fx arguments, translate into a HttpRequestMessage and invoke.
     internal class HttpFunctionInvoker
     {
-        private readonly HttpClient _httpClient;
+        private readonly HttpMessageInvoker _httpClient;
         private readonly HttpMethod _method;
         private readonly string _path;
         private readonly OpenApiParameter[] _parameters;
+        private readonly FormulaType _returnType;
+        private readonly ICachingHttpClient _cache;
 
-        public HttpFunctionInvoker(HttpClient httpClient, HttpMethod method, string path, OpenApiParameter[] parameters)
+        // Parameters must match function args exactly. 
+        public HttpFunctionInvoker(HttpMessageInvoker httpClient, HttpMethod method, string path, FormulaType returnType, OpenApiParameter[] parameters, ICachingHttpClient cache = null)
         {
             _httpClient = httpClient;
             _method = method;
             _path = path;
             _parameters = parameters;
+            _cache = cache ?? NonCachingClient.Instance;
+            _returnType = returnType;
         }
 
         public HttpRequestMessage BuildRequest(FormulaValue[] args)
@@ -83,18 +88,37 @@ namespace Microsoft.PowerFx.Connectors
                 });
             }
 
-            // $$$ Proper marshalling?
-            var result = FormulaValue.FromJson(json);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return FormulaValue.NewBlank(_returnType);
+            }
+
+            // $$$ Proper marshalling?,  use _returnType;
+            var result = FormulaValue.FromJson(json);            
+
             return result;
         }
 
-        public async Task<FormulaValue> InvokeAsync(CancellationToken cancel, FormulaValue[] args)
+        public async Task<FormulaValue> InvokeAsync(string cacheScope, CancellationToken cancel, FormulaValue[] args)
         {
+            FormulaValue result;
             var request = BuildRequest(args);
-            var response = await _httpClient.SendAsync(request, cancel);
 
-            var result = await DecodeResponseAsync(response);
-            return result;
+            var key = request.RequestUri.ToString();
+
+            if (request.Method != HttpMethod.Get)
+            {
+                _cache.Reset(cacheScope);
+            }
+
+            var result2 = await _cache.TryGetAsync(cacheScope, key, async () =>
+            {
+                var response = await _httpClient.SendAsync(request, cancel);
+                result = await DecodeResponseAsync(response);
+                return result;
+            });
+
+            return result2;
         }
     }
 }

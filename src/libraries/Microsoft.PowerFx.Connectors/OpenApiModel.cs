@@ -73,6 +73,12 @@ namespace Microsoft.PowerFx.Connectors
             var responses = op.Responses;
             var response200 = responses["200"];
 
+            if (response200.Content.Count == 0)
+            {
+                // No return type. Void() method. 
+                return FormulaType.Blank;
+            }
+
             // Responses is a list by content-type. Find "application/json"
             foreach (var kv3 in response200.Content)
             {
@@ -86,6 +92,7 @@ namespace Microsoft.PowerFx.Connectors
                 }
             }
 
+            // Returns something, but not json. 
             throw new InvalidOperationException($"Unsupported return type");
         }
     }
