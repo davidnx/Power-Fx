@@ -64,7 +64,7 @@ namespace Microsoft.PowerFx.Connectors
 
             var url = path + query.ToString();
 
-            // $$$ Body? For posts 
+            // $$$ Not handling Body yet...
             var request = new HttpRequestMessage(_method, url);
             return request;
         }
@@ -109,8 +109,9 @@ namespace Microsoft.PowerFx.Connectors
             if (request.Method != HttpMethod.Get)
             {
                 _cache.Reset(cacheScope);
+                key = null; // don't bother caching
             }
-
+                        
             var result2 = await _cache.TryGetAsync(cacheScope, key, async () =>
             {
                 var response = await _httpClient.SendAsync(request, cancel);

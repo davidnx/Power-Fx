@@ -19,6 +19,7 @@ namespace Microsoft.PowerFx.Connectors
         // Clear all cache entries for the given namespace. 
         void Reset(string cacheScope);
 
+        // Skip cache if requestKey is null. 
         Task<FormulaValue> TryGetAsync(string cacheScope, string requestKey, Func<Task<FormulaValue>> getter);
     }
 
@@ -44,7 +45,7 @@ namespace Microsoft.PowerFx.Connectors
     /// </summary>
     public class CachingHttpClient : ICachingHttpClient
     {
-        // $$$ Empty on max size...
+        // $$$ Empty on max size. Don't monotonically grow...
 
         // For GETs, map of URL to response
         private readonly Dictionary<string, Dictionary<string, FormulaValue>> _cache = new Dictionary<string, Dictionary<string, FormulaValue>>();
@@ -63,13 +64,16 @@ namespace Microsoft.PowerFx.Connectors
 
         public async Task<FormulaValue> TryGetAsync(string cacheScope, string requestKey, Func<Task<FormulaValue>> getter)
         {
-            lock (_cache)
+            if (requestKey != null)
             {
-                if (_cache.TryGetValue(cacheScope, out var dict2))
+                lock (_cache)
                 {
-                    if (dict2.TryGetValue(requestKey, out var cachedResult))
+                    if (_cache.TryGetValue(cacheScope, out var dict2))
                     {
-                        return cachedResult;
+                        if (dict2.TryGetValue(requestKey, out var cachedResult))
+                        {
+                            return cachedResult;
+                        }
                     }
                 }
             }
@@ -77,15 +81,18 @@ namespace Microsoft.PowerFx.Connectors
             // Cache miss - get the result. 
             var result = await getter();
 
-            lock (_cache)
+            if (requestKey != null)
             {
-                if (!_cache.TryGetValue(cacheScope, out var dict2))
+                lock (_cache)
                 {
-                    dict2 = new Dictionary<string, FormulaValue>();
-                    _cache[cacheScope] = dict2;
-                }
+                    if (!_cache.TryGetValue(cacheScope, out var dict2))
+                    {
+                        dict2 = new Dictionary<string, FormulaValue>();
+                        _cache[cacheScope] = dict2;
+                    }
 
-                dict2[requestKey] = result;
+                    dict2[requestKey] = result;
+                }
             }
 
             return result;
