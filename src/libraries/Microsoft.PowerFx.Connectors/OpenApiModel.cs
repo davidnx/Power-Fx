@@ -15,9 +15,9 @@ namespace Microsoft.PowerFx.Connectors
         // $$$ consistent naming here...
         private readonly OpenApiDocument _doc;
 
-        public OpenApiModel(OpenApiDocument doc)
+        public OpenApiModel(OpenApiDocument apiDocument)
         {
-            _doc = doc;
+            _doc = apiDocument;
         }
 
         public FormulaType ToType(OpenApiSchema schema)
@@ -57,14 +57,17 @@ namespace Microsoft.PowerFx.Connectors
 
         public HttpMethod ToMethod(OperationType key)
         {
-            // $$$ others
             switch (key)
             {
                 case OperationType.Get: return HttpMethod.Get;
+                case OperationType.Put: return HttpMethod.Put;
                 case OperationType.Post: return HttpMethod.Post;
-
+                case OperationType.Delete: return HttpMethod.Delete;
+                case OperationType.Options: return HttpMethod.Options;
+                case OperationType.Head: return HttpMethod.Head;
+                case OperationType.Trace: return HttpMethod.Trace;
                 default:
-                    throw new InvalidOperationException($"Unsupported method {key}");
+                    return new HttpMethod(key.ToString())
             }
         }
 
