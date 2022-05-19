@@ -16,9 +16,15 @@ namespace Microsoft.PowerFx.Connectors
     /// </summary>
     public class PowerPlatformConnectorClient : HttpClient
     {
-        // For telemetry
-        private static readonly string _version = typeof(PowerPlatformConnectorClient).Assembly.GetName().Version.ToString();
-        private static readonly string _sessionId = Guid.NewGuid().ToString(); // "f4d37a97-f1c7-4c8c-80a6-f300c651568d"
+        /// <summary>
+        /// For telemetry - assembly version stamp. 
+        /// </summary>
+        public static string Version { get; } = typeof(PowerPlatformConnectorClient).Assembly.GetName().Version.ToString();
+        
+        /// <summary>
+        /// Session Id for telemetry.
+        /// </summary>
+        public string SessionId { get; set; } = Guid.NewGuid().ToString(); // "f4d37a97-f1c7-4c8c-80a6-f300c651568d"
 
         private readonly HttpMessageInvoker _client;
 
@@ -69,11 +75,11 @@ namespace Microsoft.PowerFx.Connectors
             req.Headers.Add("authority", Endpoint);
             req.Headers.Add("scheme", "https");
             req.Headers.Add("path", "/invoke");
-            req.Headers.Add("x-ms-client-session-id", _sessionId);
+            req.Headers.Add("x-ms-client-session-id", SessionId);
             req.Headers.Add("x-ms-request-method", method.ToString());
             req.Headers.Add("authorization", "Bearer " + authToken);
             req.Headers.Add("x-ms-client-environment-id", "/providers/Microsoft.PowerApps/environments/" + EnvironmentId);
-            req.Headers.Add("x-ms-user-agent", $"PowerFx/{_version}");
+            req.Headers.Add("x-ms-user-agent", $"PowerFx/{Version}");
 
             req.Headers.Add("x-ms-request-url", url); 
 

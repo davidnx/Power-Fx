@@ -67,7 +67,7 @@ namespace Microsoft.PowerFx.Connectors
                 case OperationType.Head: return HttpMethod.Head;
                 case OperationType.Trace: return HttpMethod.Trace;
                 default:
-                    return new HttpMethod(key.ToString())
+                    return new HttpMethod(key.ToString());
             }
         }
 

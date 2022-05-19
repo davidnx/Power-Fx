@@ -21,6 +21,12 @@ namespace ConsoleApp1
             MainASPTest().Wait();
         }
 
+        static void Run(RecalcEngine engine, string expr)
+        {
+            var r1 = engine.EvalAsync(expr, CancellationToken.None).Result;
+            Console.WriteLine(r1.ToObject());
+        }
+
         static async Task MainASPTest()
         {
             var cache = new CachingHttpClient();
@@ -37,10 +43,10 @@ namespace ConsoleApp1
             var engine = new RecalcEngine(config);
             //var r1 = await engine.EvalAsync("First(Test.GetWeather(\"Redmond\", 25)).summary",CancellationToken.None);
 
-            var r1 = await engine.EvalAsync("Test.GetKey(\"Redmond\") + 5", CancellationToken.None);
-            var r4 = await engine.EvalAsync("Test.GetKey(\"Redmond\") + 5", CancellationToken.None);
-            var r2 = await engine.EvalAsync("Test.UpdateKey(\"Redmond\", 10)", CancellationToken.None);
-            var r3 = await engine.EvalAsync("Test.GetKey(\"Redmond\") + 5", CancellationToken.None);
+            Run(engine, "Test.GetKey(\"Redmond\") + 5");
+            Run(engine, "Test.GetKey(\"Redmond\") + 4");
+            Run(engine, "Test.UpdateKey(\"Redmond\", 10)");
+            Run(engine, "Test.GetKey(\"Redmond\") + 5");
         }
 
         static async Task Main2()
