@@ -2,25 +2,61 @@
 // Licensed under the MIT license.
 
 using System;
-using System.Collections.Generic;
 using System.Net.Http;
-using System.Text;
+using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using Microsoft.PowerFx.Types;
 
 namespace Microsoft.PowerFx.Connectors
 {
-    internal class OpenApiModel
+    internal static class OpenApiExtensions
     {
-        // $$$ consistent naming here...
-        private readonly OpenApiDocument _apiDocument;
-
-        public OpenApiModel(OpenApiDocument apiDocument)
+        public static string GetBasePath(this OpenApiDocument openApiDocument)
         {
-            _apiDocument = apiDocument;
+            string basePath = null;
+            if (openApiDocument?.Servers.Count == 1)
+            {
+                // This is a full URL that will pull in 'basePath' property from connectors. 
+                // Extract BasePath back out from this. 
+                var fullPath = openApiDocument.Servers[0].Url;
+                var uri = new Uri(fullPath);
+                basePath = uri.PathAndQuery;
+            }
+
+            return basePath;
         }
 
-        public FormulaType ToType(OpenApiSchema schema)
+        public static bool IsTrigger(this OpenApiOperation op)
+        {
+            var isTrigger = op.Extensions.ContainsKey("x-ms-trigger");
+            return isTrigger;
+        }
+
+        public static bool IsInternal(this OpenApiParameter param)
+        {
+            var exts = param.Extensions;
+            if (exts.TryGetValue("x-ms-visibility", out var val))
+            {
+                if (val is OpenApiString valStr)
+                {
+                    if (valStr.Value == "internal")
+                    {
+                        // connectionId is a well-known internal param, stamped later. 
+                        // $$$ be aware of any other internal params
+                        if (param.Name != "connectionId")
+                        {
+                            throw new NotImplementedException();
+                        }
+
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        public static FormulaType ToFormulaType(this OpenApiSchema schema)
         {
             switch (schema.Type)
             {
@@ -29,7 +65,7 @@ namespace Microsoft.PowerFx.Connectors
                 case "boolean": return FormulaType.Boolean;
                 case "integer": return FormulaType.Number;
                 case "array":
-                    var elementType = ToType(schema.Items);
+                    var elementType = schema.Items.ToFormulaType();
                     if (elementType is RecordType r)
                     {
                         return r.ToTable();
@@ -44,7 +80,7 @@ namespace Microsoft.PowerFx.Connectors
                     foreach (var kv in schema.Properties)
                     {
                         var propName = kv.Key;
-                        var propType = ToType(kv.Value);
+                        var propType = kv.Value.ToFormulaType();
 
                         obj = obj.Add(propName, propType);
                     }
@@ -55,7 +91,7 @@ namespace Microsoft.PowerFx.Connectors
             throw new NotImplementedException($"{schema.Type}");
         }
 
-        public HttpMethod ToMethod(OperationType key)
+        public static HttpMethod ToHttpMethod(this OperationType key)
         {
             switch (key)
             {
@@ -71,7 +107,7 @@ namespace Microsoft.PowerFx.Connectors
             }
         }
 
-        public FormulaType GetReturnType(OpenApiOperation op)
+        public static FormulaType GetReturnType(this OpenApiOperation op)
         {
             var responses = op.Responses;
             var response200 = responses["200"];
@@ -90,7 +126,7 @@ namespace Microsoft.PowerFx.Connectors
 
                 if (mediaType == "application/json")
                 {
-                    var responseType = ToType(response.Schema);
+                    var responseType = response.Schema.ToFormulaType();
                     return responseType;                    
                 }
             }

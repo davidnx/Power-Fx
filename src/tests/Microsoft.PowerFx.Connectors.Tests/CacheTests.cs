@@ -1,9 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-using System.Linq;
-using System.Net.Http;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.PowerFx.Connectors;
 using Microsoft.PowerFx.Core.Tests;
