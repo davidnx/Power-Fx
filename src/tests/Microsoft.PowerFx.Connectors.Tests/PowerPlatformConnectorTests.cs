@@ -1,23 +1,12 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
-using System.Reflection;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.OpenApi.Models;
-using Microsoft.OpenApi.Readers;
 using Microsoft.PowerFx.Connectors;
 using Microsoft.PowerFx.Core.Tests;
-using Microsoft.PowerFx.Types;
-using Newtonsoft.Json;
 using Xunit;
 
 namespace Microsoft.PowerFx.Tests
@@ -25,6 +14,7 @@ namespace Microsoft.PowerFx.Tests
     // Simulate calling PowerPlatform connectors.
     public class PowerPlatformConnectorTests : PowerFxTest
     {
+        // Exercise calling the MSNWeather connector against mocked Swagger and Response.json. 
         [Fact]
         public async Task Connector1()
         {
@@ -45,9 +35,11 @@ namespace Microsoft.PowerFx.Tests
 
             var funcs = config.AddService("MSNWeather", apiDoc, client);
 
+            // Function we added where specified in MSNWeather.json
             var funcNames = funcs.Select(func => func.Name).OrderBy(x => x).ToArray();
             Assert.Equal(funcNames, new string[] { "CurrentWeather", "GetMeasureUnits", "TodaysForecast", "TomorrowsForecast" });
 
+            // Now execute it...
             var engine = new RecalcEngine(config);
             testConnector.SetResponseFromFile(@"Responses\MSNWeather_Response.json");
 

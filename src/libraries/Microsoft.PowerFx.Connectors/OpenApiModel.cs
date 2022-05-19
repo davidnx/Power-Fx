@@ -13,11 +13,11 @@ namespace Microsoft.PowerFx.Connectors
     internal class OpenApiModel
     {
         // $$$ consistent naming here...
-        private readonly OpenApiDocument _doc;
+        private readonly OpenApiDocument _apiDocument;
 
         public OpenApiModel(OpenApiDocument apiDocument)
         {
-            _doc = apiDocument;
+            _apiDocument = apiDocument;
         }
 
         public FormulaType ToType(OpenApiSchema schema)

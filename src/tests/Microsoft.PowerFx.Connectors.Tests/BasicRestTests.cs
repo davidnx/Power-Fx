@@ -2,21 +2,10 @@
 // Licensed under the MIT license.
 
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using System.Net;
 using System.Net.Http;
-using System.Reflection;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.OpenApi.Models;
-using Microsoft.OpenApi.Readers;
-using Microsoft.PowerFx.Connectors;
 using Microsoft.PowerFx.Core.Tests;
-using Microsoft.PowerFx.Types;
-using Newtonsoft.Json;
 using Xunit;
 
 namespace Microsoft.PowerFx.Tests
@@ -31,50 +20,43 @@ namespace Microsoft.PowerFx.Tests
         [Fact]
         public async Task BasicHttpCall()
         {
-            var testConnector = new TestServer();
+            var testConnector = new LoggingTestServer(@"Swagger\TestOpenAPI.json");
+
             var httpClient = new HttpClient(testConnector)
             {
                 BaseAddress = _fakeBaseAddress
             };
 
             var config = new PowerFxConfig();
-            var doc = testConnector.GetSwagger();
+            var apiDoc = testConnector._apiDocument;
             
-            config.AddService("Test", doc, httpClient);
+            config.AddService("Test", apiDoc, httpClient);
 
             var engine = new RecalcEngine(config);
+
+            testConnector.SetResponse("55");
             var r1 = await engine.EvalAsync("Test.GetKey(\"Key1\")", CancellationToken.None);            
-            Assert.Equal(TestServer.ReturnValue, r1.ToObject());
+            Assert.Equal(55.0, r1.ToObject());
 
             var log = testConnector._log.ToString().Trim();
             Assert.Equal("GET http://localhost:5000/Keys?keyName=Key1", log);
         }
 
-        // Simulate a test connector. 
-        private class TestServer : HttpMessageHandler
+        // We can bind without calling.
+        // In this case, w edon't needd a http client at all.
+        [Fact]
+        public void BasicHttpBinding()
         {
-            public StringBuilder _log = new StringBuilder();
+            var config = new PowerFxConfig();
+            var apiDoc = Helpers.ReadSwagger(@"Swagger\TestOpenAPI.json");
 
-            public OpenApiDocument GetSwagger()
-            {
-                return Helpers.ReadSwagger(@"Swagger\TestOpenAPI.json");
-            }
+            // If we don't pass httpClient, we can still bind, we just can't invoke.
+            config.AddService("Test", apiDoc, null);
 
-            public static double ReturnValue = 55.0;
+            var engine = new Engine(config);
 
-            protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            {
-                var method = request.Method;
-                var url = request.RequestUri.ToString();
-
-                _log.AppendLine($"{method} {url}");
-
-                var response = new HttpResponseMessage(HttpStatusCode.OK);
-                var json = JsonConvert.SerializeObject(ReturnValue);
-                response.Content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                return response;
-            }
+            var r1 = engine.Check("Test.GetKey(\"Key1\")");
+            Assert.True(r1.IsSuccess);
         }
     }
 }

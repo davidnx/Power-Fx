@@ -41,7 +41,7 @@ namespace Microsoft.PowerFx.Connectors
     }        
 
     /// <summary>
-    /// Simple cache for GETs. CAche is reset when a POST is made. 
+    /// Simple cache for GETs. Cache is reset when a POST is made. 
     /// </summary>
     public class CachingHttpClient : ICachingHttpClient
     {

@@ -3,33 +3,16 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Web;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
-using Microsoft.OpenApi.Readers;
 using Microsoft.PowerFx.Connectors;
-using Microsoft.PowerFx.Core.Functions;
-using Microsoft.PowerFx.Core.Localization;
-using Microsoft.PowerFx.Core.Types;
-using Microsoft.PowerFx.Core.Utils;
 using Microsoft.PowerFx.Types;
-using static Microsoft.PowerFx.Core.Localization.TexlStrings;
 
 namespace Microsoft.PowerFx
 {
-    // $$$ Split into separate classes 
-
     public static class ConfigExtensions
     {
-        // - Must be HttpClient since we need to set the BaseAddress
-        // $$$ HttpClient only needed if we want to invoke... (not needed for binding)
-        // $$$ Return the functions that we did add?
-
         /// <summary>
         /// Add functions for each operation in the <see cref="OpenApiDocument"/>. 
         /// Functions names will be 'functionNamespace.operationName'.
@@ -39,6 +22,7 @@ namespace Microsoft.PowerFx
         /// <param name="functionNamespace"></param>
         /// <param name="openApiDocument"></param>
         /// <param name="httpClient"></param>
+        /// <param name="cache"></param>
         public static IReadOnlyList<FunctionInfo> AddService(this PowerFxConfig config, string functionNamespace, OpenApiDocument openApiDocument, HttpMessageInvoker httpClient, ICachingHttpClient cache = null)
         {
             if (openApiDocument == null)
@@ -130,7 +114,7 @@ namespace Microsoft.PowerFx
                         null : 
                         new HttpFunctionInvoker(httpClient, verb, path, returnType, requiredParams.ToArray(), cache);
 
-                    var function = new MyTexlFunction(functionNamespace, operationName, returnType, paramTypes.ToArray())
+                    var function = new ServiceFunction(functionNamespace, operationName, returnType, paramTypes.ToArray())
                     {
                         _invoker = invoker
                     };
@@ -141,42 +125,6 @@ namespace Microsoft.PowerFx
             }
 
             return newFunctions;
-        }
-
-        // $$$ Add Cache for HttpGet...
-        // $$$ Replace with ServiceFunction 
-        private class MyTexlFunction : TexlFunction, IAsyncTexlFunction
-        {
-            // $$$ Post operations should be behavior 
-            public override bool IsSelfContained => true;
-
-            public HttpFunctionInvoker _invoker;
-            
-            public MyTexlFunction(string functionNamespace, string name, FormulaType returnType, params FormulaType[] paramTypes)
-    : this(functionNamespace, name, returnType._type, Array.ConvertAll(paramTypes, x => x._type))
-            {
-            }
-
-            public MyTexlFunction(string functionNamespace, string name, DType returnType, params DType[] paramTypes)
-                : base(DPath.Root.Append(new DName(functionNamespace)), name, name, SG("Custom func " + name), FunctionCategories.MathAndStat, returnType, 0, paramTypes.Length, paramTypes.Length, paramTypes)
-            {
-            }
-
-            public override IEnumerable<TexlStrings.StringGetter[]> GetSignatures()
-            {
-                yield return new[] { SG("Arg 1") };
-            }
-
-            public static StringGetter SG(string text)
-            {
-                return (string locale) => text;
-            }
-
-            public Task<FormulaValue> InvokeAsync(FormulaValue[] args, CancellationToken cancel)
-            {
-                var cacheScope = Namespace.Name.Value;
-                return _invoker.InvokeAsync(cacheScope, cancel, args);
-            }
         }
     }
 }
